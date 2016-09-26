@@ -22,33 +22,35 @@ type (
 
 	// websocketRoomPayload is used as payload from the connection to the server
 	websocketRoomPayload struct {
+		namespace    string
 		roomName     string
 		connectionID string
 	}
 
 	// payloads, connection -> server
 	websocketMessagePayload struct {
-		to   string
-		data []byte
+		namespace string
+		to        string
+		data      []byte
 	}
 
 	Server struct {
 		config                Config
-		put                   chan *connection
-		free                  chan *connection
-		connections           map[string]*connection
+		put                   chan *Connection
+		free                  chan *Connection
+		connections           map[string]*Connection
 		join                  chan websocketRoomPayload
 		leave                 chan websocketRoomPayload
-		rooms                 Rooms      // by default a connection is joined to a room which has the connection id as its name
-		mu                    sync.Mutex // for rooms
+		mu                    sync.Mutex // for namespaces
 		messages              chan websocketMessagePayload
 		onConnectionListeners []ConnectionFunc
 		//connectionPool        *sync.Pool // sadly I can't make this because the websocket connection is live until is closed.
 		broadcast Emmiter
+
+		// NameSpace
+		namespaces map[string]*NameSpace
 	}
 )
-
-var _ Server = &Server{}
 
 // server implementation
 
@@ -75,11 +77,14 @@ func newServer(c Config) *Server {
 		rooms:                 make(Rooms),
 		messages:              make(chan websocketMessagePayload, 1), // buffered because messages can be sent/received immediately on connection connected
 		onConnectionListeners: make([]ConnectionFunc, 0),
+		namespaces:            make(map[string]*NameSpace),
 	}
 
 	s.broadcast = newEmmiter(s, All)
 
-	// go s.serve() // start the ws server
+	// default  namespace
+	s.namespaces[defaultNameSpaceName] = &NameSpace{name: defaultNameSpaceName, server: s, rooms: make(Rooms)}
+
 	return s
 }
 
@@ -101,19 +106,11 @@ func (s *Server) Handler() http.Handler {
 			http.Error(res, "Websocket Error: "+err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-        if c.BeforeConnectionFunc != nil {
-            err,code := c.BeforeConnectionFunc(req)
-            if err != nil {
-                http.Error(res, err.Error(),code)
-                return
-            }
-        }
-
 		s.handleConnection(conn, req)
 	})
 }
 
-func (s *Server) handleConnection(websocketConn UnderlineConnection, req *http.Request) {
+func (s *Server) handleConnection(websocketConn *websocekt.Conn, req *http.Request) {
 	c := newConnection(websocketConn, s, req)
 	s.put <- c
 	go c.writer()
@@ -125,31 +122,87 @@ func (s *Server) OnConnection(cb ConnectionFunc) {
 	s.onConnectionListeners = append(s.onConnectionListeners, cb)
 }
 
-func (s *Server) joinRoom(roomName string, connID string) {
+func (s *Server) joinRoom(namespaceName string, roomName string, connID string) {
 	s.mu.Lock()
-	if s.rooms[roomName] == nil {
-		s.rooms[roomName] = make([]string, 0)
+	defer s.mu.Unlock()
+	namespace := s.namespaces[namespaceName]
+	if namespace == nil {
+		return
 	}
-	s.rooms[roomName] = append(s.rooms[roomName], connID)
-	s.mu.Unlock()
+	if namespace.rooms[roomName] == nil {
+		namespace.rooms[roomName] = make([]string, 0)
+	}
+	namespace.rooms[roomName] = append(namespace.rooms[roomName], connID)
 }
 
-func (s *Server) leaveRoom(roomName string, connID string) {
+func (s *Server) leaveRoom(namespaceName string, roomName string, connID string) {
 	s.mu.Lock()
-	if s.rooms[roomName] != nil {
-		for i := range s.rooms[roomName] {
-			if s.rooms[roomName][i] == connID {
-				s.rooms[roomName][i] = s.rooms[roomName][len(s.rooms[roomName])-1]
-				s.rooms[roomName] = s.rooms[roomName][:len(s.rooms[roomName])-1]
+	defer s.mu.Unlock()
+	namespace := s.namespaces[namespaceName]
+	if namespace == nil {
+		return
+	}
+
+	if namespace.rooms[roomName] != nil {
+		for i := range namespace.rooms[roomName] {
+			if namespace.rooms[roomName][i] == connID {
+				namespace.rooms[roomName][i] = namespace.rooms[roomName][len(s.rooms[roomName])-1]
+				namespace.rooms[roomName] = namespace.rooms[roomName][:len(namespace.rooms[roomName])-1]
 				break
 			}
 		}
-		if len(s.rooms[roomName]) == 0 { // if room is empty then delete it
-			delete(s.rooms, roomName)
+		if len(namespace.rooms[roomName]) == 0 { // if room is empty then delete it
+			delete(namespace.rooms, roomName)
 		}
 	}
 
-	s.mu.Unlock()
+	// todo  if namespce is empty  we need to delete it
+}
+
+func (s *Server) onPut(c *Connection) {
+
+	s.connections[c.id] = c
+	// make and join a room with the connection's id
+	s.rooms[c.id] = make([]string, 0)
+	s.rooms[c.id] = []string{c.id}
+
+	namespaceName := c.Request().FormValue(nameSpaceFormKey)
+
+	if s.namespaces[namespaceName] == nil {
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		namespce := &NameSpace{server: s, name: namespaceName, rooms: make(Rooms)}
+		namespce.rooms[c.id] = make([]string, 0)
+		namespce.rooms[c.id] = []string{c.id}
+		s.namespaces[namespaceName] = namespce
+		c.namespace = namespce
+
+	}
+
+	for i := range s.onConnectionListeners {
+		s.onConnectionListeners[i](c)
+	}
+
+}
+
+func (s *Server) onFree(c *Connection) {
+
+	//  todo checks  namespace
+
+	if _, found := s.connections[c.id]; found {
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		for roomName := range c.namespace.rooms {
+			s.leaveRoom(c.namespace.name, roomName, c.id)
+		}
+		delete(s.connections, c.id)
+		close(c.send)
+		c.fireDisconnect()
+	}
+
 }
 
 // Serve starts the websocket server
@@ -157,14 +210,31 @@ func (s *Server) Serve() {
 	go s.serve()
 }
 
+//  to the default namespace
 func (s *Server) To(to string) Emmiter {
 
-	if to == All { //send to all
-		return s.broadcast
-	}
+	// send to  default namespace's room
+	namespance := s.namespaces[defaultNameSpaceName]
 
-	// send to a room
-	return newEmmiter(s, to)
+	return newEmmiter(namespance, to)
+}
+
+func (s *Server) ToAll() Emmiter {
+
+	return s.broadcast
+}
+
+func (s *Server) List(room string) []*Connection {
+
+	namespance := s.namespaces[defaultNameSpaceName]
+
+	var connList []*Connection
+	for _, connectionIDInsideRoom := range namespance.rooms[room] {
+		if c, connected := s.connections[connectionIDInsideRoom]; connected {
+			connList.append(c)
+		}
+	}
+	return connList
 }
 
 func (s *Server) GetConnection(cid string) Connection {
@@ -176,48 +246,28 @@ func (s *Server) GetConnection(cid string) Connection {
 	return conn
 }
 
-func (s *Server) List(room string) []Connection {
+func (s *Server) Of(namespaceName string) *NameSpace {
 
-	var connList []Connection
-	for _, connectionIDInsideRoom := range s.rooms[room] {
-		if c, connected := s.connections[connectionIDInsideRoom]; connected {
-			connList.append(c)
-		}
+	if namespace, ok := s.namespaces[namespaceName]; ok {
+		return namespace
 	}
-	return connList
-}
 
-func (s *Server) Amount() int {
-
-	return len(s.connections)
+	// if not  we just create a,  but not save to server
+	namespace := &NameSpace{server: s, name: namespaceName}
+	return namespace
 }
 
 func (s *Server) serve() {
 	for {
 		select {
 		case c := <-s.put: // connection established
-			s.connections[c.id] = c
-			// make and join a room with the connection's id
-			s.rooms[c.id] = make([]string, 0)
-			s.rooms[c.id] = []string{c.id}
-			for i := range s.onConnectionListeners {
-				s.onConnectionListeners[i](c)
-			}
+			s.onPut(c)
 		case c := <-s.free: // connection closed
-			if _, found := s.connections[c.id]; found {
-				// leave from all rooms
-				for roomName := range s.rooms {
-					s.leaveRoom(roomName, c.id)
-				}
-				delete(s.connections, c.id)
-				close(c.send)
-				c.fireDisconnect()
-
-			}
+			s.onFree(c)
 		case join := <-s.join:
-			s.joinRoom(join.roomName, join.connectionID)
+			s.joinRoom(join.namespace, join.roomName, join.connectionID)
 		case leave := <-s.leave:
-			s.leaveRoom(leave.roomName, leave.connectionID)
+			s.leaveRoom(leave.namespace, leave.roomName, leave.connectionID)
 		case msg := <-s.messages: // message received from the connection
 			if msg.to == All {
 				for connID, c := range s.connections {
@@ -232,16 +282,23 @@ func (s *Server) serve() {
 
 				}
 
-			} else if _, ok := s.rooms[msg.to]; ok {
-				// it suppose to send the message to a room
-				for _, connectionIDInsideRoom := range s.rooms[msg.to] {
-					if c, connected := s.connections[connectionIDInsideRoom]; connected {
-						c.send <- msg.data //here we send it without need to continue below
-					} else {
-						// the connection is not connected but it's inside the room, we remove it on disconnect but for ANY CASE:
-						s.leaveRoom(c.id, msg.to)
+			} else if namespace, ok := s.namespaces[msg.namespace]; ok {
+
+				// get namespace first
+				if _, ok := namespace.rooms[msg.to]; ok {
+
+					for _, connectionIDInsideRoom := range namespace.rooms[msg.to] {
+						if c, connected := s.connections[connectionIDInsideRoom]; connected {
+							c.send <- msg.data //here we send it without need to continue below
+						} else {
+							// the connection is not connected but it's inside the room, we remove it on disconnect but for ANY CASE:
+							s.leaveRoom(msg.namespace, c.id, msg.to)
+						}
 					}
+
 				}
+				// it suppose to send the message to a room
+
 			}
 
 		}

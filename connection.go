@@ -40,6 +40,8 @@ type (
 		request *http.Request
 		server  *Server
 
+		namespace *NameSpace
+
 		//add some custom data
 		data map[string]string
 	}
@@ -244,12 +246,12 @@ func (c *Connection) On(event string, cb MessageFunc) {
 }
 
 func (c *Connection) Join(roomName string) {
-	payload := websocketRoomPayload{roomName, c.id}
+	payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
 	c.server.join <- payload
 }
 
 func (c *Connection) Leave(roomName string) {
-	payload := websocketRoomPayload{roomName, c.id}
+	payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
 	c.server.leave <- payload
 }
 

@@ -21,20 +21,20 @@ type (
 	}
 
 	emmiter struct {
-		server *server
-		to     string
+		namespace *NameSpace
+		to        string
 	}
 )
 
 var _ Emmiter = &emmiter{}
 
-func newEmmiter(server *server, to string) *emmiter {
-	return &emmiter{server: server, to: to}
+func newEmmiter(namespace *NameSpace, to string) *emmiter {
+	return &emmiter{namespace: namespace, to: to}
 }
 
 func (e *emmiter) EmitMessage(nativeMessage []byte) error {
 	mp := websocketMessagePayload{e.to, nativeMessage}
-	e.server.messages <- mp
+	e.namespace.server.messages <- mp
 	return nil
 }
 
