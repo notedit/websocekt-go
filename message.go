@@ -114,7 +114,7 @@ func websocketMessageSerialize(event string, data interface{}) (string, error) {
 
 }
 
-var errInvalidTypeMessage = errors.New("Type %s is invalid for message: %s")
+var errInvalidTypeMessage = errors.New("message is invalid")
 
 // websocketMessageDeserialize deserializes a custom websocket message from the client
 // ex: go-websocket-message;chat;4;themarshaledstringfromajsonstruct will return 'hello' as string
@@ -138,7 +138,7 @@ func websocketMessageDeserialize(event string, websocketMessage string) (message
 	} else if _type == websocketJSONMessageType {
 		err = json.Unmarshal([]byte(_message), &message)
 	} else {
-		return nil, errInvalidTypeMessage.Format(_type.Name(), websocketMessage)
+		return nil, errInvalidTypeMessage
 	}
 
 	return

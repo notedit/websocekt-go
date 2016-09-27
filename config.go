@@ -25,8 +25,6 @@ type Config struct {
 	Error       func(res http.ResponseWriter, req *http.Request, status int, reason error)
 	CheckOrigin func(req *http.Request) bool
 
-    // code is http code
-	BeforeConnectionFunc func(req *http.Request) (error,code)
 	// WriteTimeout time allowed to write a message to the connection.
 	// Default value is 15 * time.Second
 	WriteTimeout time.Duration

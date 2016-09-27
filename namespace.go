@@ -21,7 +21,7 @@ func (n *NameSpace) List(room string) []*Connection {
 	var connList []*Connection
 	for _, connectionIDInsideRoom := range n.rooms[room] {
 		if c, connected := n.server.connections[connectionIDInsideRoom]; connected {
-			connList.append(c)
+			connList = append(connList, c)
 		}
 	}
 	return connList

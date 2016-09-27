@@ -33,7 +33,7 @@ func newEmmiter(namespace *NameSpace, to string) *emmiter {
 }
 
 func (e *emmiter) EmitMessage(nativeMessage []byte) error {
-	mp := websocketMessagePayload{e.to, nativeMessage}
+	mp := websocketMessagePayload{e.namespace.name, e.to, nativeMessage}
 	e.namespace.server.messages <- mp
 	return nil
 }

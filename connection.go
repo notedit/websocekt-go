@@ -47,8 +47,8 @@ type (
 	}
 )
 
-func newConnection(underlineConn *websocket.Conn, s *server, req *http.Request) *Connection {
-	c := &connection{
+func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) *Connection {
+	c := &Connection{
 		underline:   underlineConn,
 		id:          RandomString(64),
 		messageType: websocket.TextMessage,
@@ -219,7 +219,7 @@ func (c *Connection) EmitError(errorMessage string) {
 }
 
 func (c *Connection) EmitMessage(nativeMessage []byte) error {
-	mp := websocketMessagePayload{c.id, nativeMessage}
+	mp := websocketMessagePayload{c.namespace.name ,c.id, nativeMessage}
 	c.server.messages <- mp
 	return nil
 }

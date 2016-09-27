@@ -16,7 +16,7 @@ import (
 type (
 	// ConnectionFunc is the callback which fires when a client/connection is connected to the server.
 	// Receives one parameter which is the Connection
-	ConnectionFunc func(Connection)
+	ConnectionFunc func(*Connection)
 	// Rooms is just a map with key a string and  value slice of string
 	Rooms map[string][]string
 
@@ -69,21 +69,19 @@ func newServer(c Config) *Server {
 
 	s := &Server{
 		config:                c,
-		put:                   make(chan *connection),
-		free:                  make(chan *connection),
-		connections:           make(map[string]*connection),
+		put:                   make(chan *Connection),
+		free:                  make(chan *Connection),
+		connections:           make(map[string]*Connection),
 		join:                  make(chan websocketRoomPayload, 1), // buffered because join can be called immediately on connection connected
 		leave:                 make(chan websocketRoomPayload),
-		rooms:                 make(Rooms),
 		messages:              make(chan websocketMessagePayload, 1), // buffered because messages can be sent/received immediately on connection connected
 		onConnectionListeners: make([]ConnectionFunc, 0),
 		namespaces:            make(map[string]*NameSpace),
 	}
 
-	s.broadcast = newEmmiter(s, All)
-
 	// default  namespace
-	s.namespaces[defaultNameSpaceName] = &NameSpace{name: defaultNameSpaceName, server: s, rooms: make(Rooms)}
+	s.namespaces[defaultNameSpaceName] = defaultNameSpace
+	s.broadcast = newEmmiter(defaultNameSpace, All)
 
 	return s
 }
@@ -110,7 +108,7 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
-func (s *Server) handleConnection(websocketConn *websocekt.Conn, req *http.Request) {
+func (s *Server) handleConnection(websocketConn *websocket.Conn, req *http.Request) {
 	c := newConnection(websocketConn, s, req)
 	s.put <- c
 	go c.writer()
@@ -146,7 +144,7 @@ func (s *Server) leaveRoom(namespaceName string, roomName string, connID string)
 	if namespace.rooms[roomName] != nil {
 		for i := range namespace.rooms[roomName] {
 			if namespace.rooms[roomName][i] == connID {
-				namespace.rooms[roomName][i] = namespace.rooms[roomName][len(s.rooms[roomName])-1]
+				namespace.rooms[roomName][i] = namespace.rooms[roomName][len(namespace.rooms[roomName])-1]
 				namespace.rooms[roomName] = namespace.rooms[roomName][:len(namespace.rooms[roomName])-1]
 				break
 			}
@@ -162,9 +160,6 @@ func (s *Server) leaveRoom(namespaceName string, roomName string, connID string)
 func (s *Server) onPut(c *Connection) {
 
 	s.connections[c.id] = c
-	// make and join a room with the connection's id
-	s.rooms[c.id] = make([]string, 0)
-	s.rooms[c.id] = []string{c.id}
 
 	namespaceName := c.Request().FormValue(nameSpaceFormKey)
 
@@ -231,13 +226,13 @@ func (s *Server) List(room string) []*Connection {
 	var connList []*Connection
 	for _, connectionIDInsideRoom := range namespance.rooms[room] {
 		if c, connected := s.connections[connectionIDInsideRoom]; connected {
-			connList.append(c)
+			connList = append(connList, c)
 		}
 	}
 	return connList
 }
 
-func (s *Server) GetConnection(cid string) Connection {
+func (s *Server) GetConnection(cid string) *Connection {
 
 	conn, ok := s.connections[cid]
 	if !ok {
