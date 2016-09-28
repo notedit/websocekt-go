@@ -250,6 +250,14 @@ func (c *Connection) On(event string, cb MessageFunc) {
 	c.onEventListeners[event] = append(c.onEventListeners[event], cb)
 }
 
+
+
+func (c *Connection)List(room string) []*Connection {
+
+    return c.namespace.List(room)
+}
+
+
 func (c *Connection) Join(roomName string) {
 	payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
 	c.server.join <- payload
