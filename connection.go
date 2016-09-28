@@ -204,6 +204,11 @@ func (c *Connection) fireDisconnect() {
 	}
 }
 
+func (c *Connection) To(to string) Emmiter {
+
+	return newEmmiter(c.namespace, to)
+}
+
 func (c *Connection) OnDisconnect(cb DisconnectFunc) {
 	c.onDisconnectListeners = append(c.onDisconnectListeners, cb)
 }
@@ -219,7 +224,7 @@ func (c *Connection) EmitError(errorMessage string) {
 }
 
 func (c *Connection) EmitMessage(nativeMessage []byte) error {
-	mp := websocketMessagePayload{c.namespace.name ,c.id, nativeMessage}
+	mp := websocketMessagePayload{c.namespace.name, c.id, nativeMessage}
 	c.server.messages <- mp
 	return nil
 }

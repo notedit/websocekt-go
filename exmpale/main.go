@@ -5,7 +5,7 @@ import (
 	"net/http"
 
     
-    "github.com/notedit/websocket-go"
+    "../../websocket-go"
 )
 
 func handleWebsocketConnection(c *websocket.Connection) {

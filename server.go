@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -163,6 +164,8 @@ func (s *Server) onPut(c *Connection) {
 
 	namespaceName := c.Request().FormValue(nameSpaceFormKey)
 
+	log.Println("namespace   ", namespaceName)
+
 	if s.namespaces[namespaceName] == nil {
 
 		s.mu.Lock()
@@ -172,8 +175,11 @@ func (s *Server) onPut(c *Connection) {
 		namespce.rooms[c.id] = []string{c.id}
 		s.namespaces[namespaceName] = namespce
 		c.namespace = namespce
-
+	} else {
+		c.namespace = s.namespaces[namespaceName]
 	}
+
+	log.Println("namespace   ", namespaceName)
 
 	for i := range s.onConnectionListeners {
 		s.onConnectionListeners[i](c)
