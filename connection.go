@@ -1,6 +1,7 @@
 package websocket
 
 import (
+    "log"
 	"bytes"
 	"net/http"
 	"strconv"
@@ -206,6 +207,7 @@ func (c *Connection) fireDisconnect() {
 
 func (c *Connection) To(to string) Emmiter {
 
+
 	return newEmmiter(c.namespace, to)
 }
 
@@ -254,18 +256,32 @@ func (c *Connection) On(event string, cb MessageFunc) {
 
 func (c *Connection)List(room string) []*Connection {
 
+
+    if c.namespace == nil {
+
+        return make([]*Connection,0)
+    }
+
     return c.namespace.List(room)
 }
 
 
 func (c *Connection) Join(roomName string) {
-	payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
-	c.server.join <- payload
+	//payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
+	//c.server.join <- payload
+    // use the new join
+
+    c.namespace.joinRoom(roomName,c.id)
+    
 }
 
 func (c *Connection) Leave(roomName string) {
-	payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
-	c.server.leave <- payload
+	//payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
+	//c.server.leave <- payload
+    // use the new leave
+
+    c.namespace.leaveRoom(roomName,c.id)
+
 }
 
 func (c *Connection) Disconnect() error {

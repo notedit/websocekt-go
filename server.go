@@ -73,14 +73,16 @@ func newServer(c Config) *Server {
 		put:                   make(chan *Connection),
 		free:                  make(chan *Connection),
 		connections:           make(map[string]*Connection),
-		join:                  make(chan websocketRoomPayload, 1), // buffered because join can be called immediately on connection connected
+		join:                  make(chan websocketRoomPayload,1), // buffered because join can be called immediately on connection connected
 		leave:                 make(chan websocketRoomPayload),
-		messages:              make(chan websocketMessagePayload, 1), // buffered because messages can be sent/received immediately on connection connected
-		onConnectionListeners: make([]ConnectionFunc, 0),
+		messages:              make(chan websocketMessagePayload, 10), // buffered because messages can be sent/received immediately on connection connected
+		onConnectionListeners: make([]ConnectionFunc,0),
 		namespaces:            make(map[string]*NameSpace),
+        mu:                    sync.Mutex{},
 	}
 
 	// default  namespace
+    defaultNameSpace := &NameSpace{s,defaultNameSpaceName,make(Rooms),sync.Mutex{}}
 	s.namespaces[defaultNameSpaceName] = defaultNameSpace
 	s.broadcast = newEmmiter(defaultNameSpace, All)
 
@@ -116,6 +118,7 @@ func (s *Server) handleConnection(websocketConn *websocket.Conn, req *http.Reque
 	c.reader()
 }
 
+
 // OnConnection this is the main event you, as developer, will work with each of the websocket connections
 func (s *Server) OnConnection(cb ConnectionFunc) {
 	s.onConnectionListeners = append(s.onConnectionListeners, cb)
@@ -124,14 +127,16 @@ func (s *Server) OnConnection(cb ConnectionFunc) {
 func (s *Server) joinRoom(namespaceName string, roomName string, connID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	namespace := s.namespaces[namespaceName]
-	if namespace == nil {
+
+    namespace,ok := s.namespaces[namespaceName]
+	if ! ok {
 		return
 	}
-	if namespace.rooms[roomName] == nil {
+	if _,ok = namespace.rooms[roomName]; !ok  {
 		namespace.rooms[roomName] = make([]string, 0)
 	}
 	namespace.rooms[roomName] = append(namespace.rooms[roomName], connID)
+
 }
 
 func (s *Server) leaveRoom(namespaceName string, roomName string, connID string) {
@@ -160,30 +165,27 @@ func (s *Server) leaveRoom(namespaceName string, roomName string, connID string)
 
 func (s *Server) onPut(c *Connection) {
 
-	s.connections[c.id] = c
+
+    s.mu.Lock()
+    
+    s.connections[c.id] = c
 
 	namespaceName := c.Request().FormValue(nameSpaceFormKey)
-
-	log.Println("namespace   ", namespaceName)
-
-	if s.namespaces[namespaceName] == nil {
-
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		namespce := &NameSpace{server: s, name: namespaceName, rooms: make(Rooms)}
-		namespce.rooms[c.id] = make([]string, 0)
-		namespce.rooms[c.id] = []string{c.id}
-		s.namespaces[namespaceName] = namespce
-		c.namespace = namespce
-	} else {
-		c.namespace = s.namespaces[namespaceName]
+    
+    namespace, ok := s.namespaces[namespaceName]
+    if !ok {
+		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
+		s.namespaces[namespaceName] = namespace
 	}
 
-	log.Println("namespace   ", namespaceName)
+    c.namespace = namespace
+    namespace.joinRoom(c.id,c.id)   // join a default room
+    s.mu.Unlock()
 
 	for i := range s.onConnectionListeners {
 		s.onConnectionListeners[i](c)
 	}
+
 
 }
 
@@ -194,14 +196,16 @@ func (s *Server) onFree(c *Connection) {
 	if _, found := s.connections[c.id]; found {
 
 		s.mu.Lock()
-		defer s.mu.Unlock()
 
 		for roomName := range c.namespace.rooms {
 			s.leaveRoom(c.namespace.name, roomName, c.id)
 		}
 		delete(s.connections, c.id)
 		close(c.send)
-		c.fireDisconnect()
+        s.mu.Unlock()
+		
+        
+        c.fireDisconnect()
 	}
 
 }
