@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"log"
 	"net/http"
 	"sync"
 
@@ -124,44 +123,6 @@ func (s *Server) OnConnection(cb ConnectionFunc) {
 	s.onConnectionListeners = append(s.onConnectionListeners, cb)
 }
 
-func (s *Server) joinRoom(namespaceName string, roomName string, connID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-    namespace,ok := s.namespaces[namespaceName]
-	if ! ok {
-		return
-	}
-	if _,ok = namespace.rooms[roomName]; !ok  {
-		namespace.rooms[roomName] = make([]string, 0)
-	}
-	namespace.rooms[roomName] = append(namespace.rooms[roomName], connID)
-
-}
-
-func (s *Server) leaveRoom(namespaceName string, roomName string, connID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	namespace := s.namespaces[namespaceName]
-	if namespace == nil {
-		return
-	}
-
-	if namespace.rooms[roomName] != nil {
-		for i := range namespace.rooms[roomName] {
-			if namespace.rooms[roomName][i] == connID {
-				namespace.rooms[roomName][i] = namespace.rooms[roomName][len(namespace.rooms[roomName])-1]
-				namespace.rooms[roomName] = namespace.rooms[roomName][:len(namespace.rooms[roomName])-1]
-				break
-			}
-		}
-		if len(namespace.rooms[roomName]) == 0 { // if room is empty then delete it
-			delete(namespace.rooms, roomName)
-		}
-	}
-
-	// todo  if namespce is empty  we need to delete it
-}
 
 func (s *Server) onPut(c *Connection) {
 
@@ -198,7 +159,7 @@ func (s *Server) onFree(c *Connection) {
 		s.mu.Lock()
 
 		for roomName := range c.namespace.rooms {
-			s.leaveRoom(c.namespace.name, roomName, c.id)
+            c.namespace.leaveRoom(roomName,c.id)
 		}
 		delete(s.connections, c.id)
 		close(c.send)
@@ -269,10 +230,6 @@ func (s *Server) serve() {
 			s.onPut(c)
 		case c := <-s.free: // connection closed
 			s.onFree(c)
-		case join := <-s.join:
-			s.joinRoom(join.namespace, join.roomName, join.connectionID)
-		case leave := <-s.leave:
-			s.leaveRoom(leave.namespace, leave.roomName, leave.connectionID)
 		case msg := <-s.messages: // message received from the connection
 			if msg.to == All {
 				for connID, c := range s.connections {
@@ -297,7 +254,7 @@ func (s *Server) serve() {
 							c.send <- msg.data //here we send it without need to continue below
 						} else {
 							// the connection is not connected but it's inside the room, we remove it on disconnect but for ANY CASE:
-							s.leaveRoom(msg.namespace, c.id, msg.to)
+                            c.namespace.leaveRoom(msg.to, c.id)
 						}
 					}
 

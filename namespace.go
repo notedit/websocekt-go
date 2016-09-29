@@ -1,7 +1,6 @@
 package websocket
 
 import (
-    "log"
     "sync"
 
 )
