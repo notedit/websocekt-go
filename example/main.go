@@ -5,7 +5,7 @@ import (
     "log"
     "fmt"
 	"net/http"
-
+    "runtime"
     "time"
     
     "../../websocket-go"
@@ -60,7 +60,10 @@ func handleWebsocketConnection(c *websocket.Connection) {
 }
 
 func main() {
-
+    
+    num := runtime.NumCPU()
+    runtime.GOMAXPROCS(num)
+    
     server = websocket.New(websocket.Config{})
 
 	http.Handle("/testnamespace", server.Handler())
