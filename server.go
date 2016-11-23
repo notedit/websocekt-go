@@ -128,23 +128,13 @@ func (s *Server) onPut(c *Connection) {
 
 
     s.mu.Lock()
-    
     s.connections[c.id] = c
+	defer s.mu.Unlock()
 
-	namespaceName := c.Request().FormValue(nameSpaceFormKey)
+    c.namespace.joinRoom(c.id,c.id)   // join a default room
     
-    namespace, ok := s.namespaces[namespaceName]
-    if !ok {
-		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
-		s.namespaces[namespaceName] = namespace
-	}
-
-    c.namespace = namespace
-    namespace.joinRoom(c.id,c.id)   // join a default room
-    s.mu.Unlock()
-
 	for i := range s.onConnectionListeners {
-		s.onConnectionListeners[i](c)
+		go s.onConnectionListeners[i](c)
 	}
 
 

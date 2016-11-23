@@ -5,15 +5,12 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"sync"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
-// -------------------------------Connection implementation-----------------------------
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
 
 type (
 	// DisconnectFunc is the callback which fires when a client/connection closed
@@ -62,9 +59,28 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 		data:                     make(map[string]string),
 	}
 
+	namespaceName := c.Request().URL.Path
+
+	if strings.HasPrefix(namespaceName, "/") {
+		namespaceName = namespaceName[1:]
+	}
+    
+    namespace, ok := s.namespaces[namespaceName]
+
+    if !ok {
+		s.mu.Lock()
+		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
+		s.namespaces[namespaceName] = namespace
+		s.mu.Unlock()
+	}
+
+	c.namespace = namespace
+
 	if s.config.BinaryMessages {
 		c.messageType = websocket.TextMessage
 	}
+
+	
 
 	return c
 }

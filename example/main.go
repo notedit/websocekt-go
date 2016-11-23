@@ -11,6 +11,11 @@ import (
     "../../websocket-go"
 )
 
+
+
+var server *websocket.Server  // with the default configuration
+
+
 func handleWebsocketConnection(c *websocket.Connection) {
 
 
@@ -32,6 +37,7 @@ func handleWebsocketConnection(c *websocket.Connection) {
 	})
 
 
+    // test room
     go func(c *websocket.Connection){
 
         time.Sleep(2 * time.Second)
@@ -42,17 +48,26 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
     }(c)
 
+    // test namespace
+    go func(){
+        
+        time.Sleep(4 * time.Second)
+
+        server.Of("testnamespace").To("testroom").Emit("chat","fffffffffffffffff")
+
+    }()
+
 }
 
 func main() {
 
-	ws := websocket.New(websocket.Config{}) // with the default configuration
+    server = websocket.New(websocket.Config{})
 
-	http.Handle("/ws", ws.Handler())
+	http.Handle("/testnamespace", server.Handler())
 
-	ws.OnConnection(handleWebsocketConnection)
+	server.OnConnection(handleWebsocketConnection)
 
-	ws.Serve()
+	server.Serve()
 
 	fmt.Println("start server ", "3000")
 

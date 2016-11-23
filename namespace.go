@@ -31,9 +31,7 @@ func (n *NameSpace) List(room string) []*Connection {
 }
 
 func (n *NameSpace) To(to string) Emmiter {
-
 	// send to  default namespace's room
-
 	return newEmmiter(n, to)
 
 }
