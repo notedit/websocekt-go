@@ -39,15 +39,14 @@ type (
 		put                   chan *Connection
 		free                  chan *Connection
 		connections           map[string]*Connection
-		join                  chan websocketRoomPayload
-		leave                 chan websocketRoomPayload
-		mu                    sync.Mutex // for namespaces
+		coLock                sync.RWMutex
 		messages              chan websocketMessagePayload
 		onConnectionListeners []ConnectionFunc
 		broadcast Emmiter
 
 		// NameSpace
 		namespaces map[string]*NameSpace
+		nsLock	    sync.Mutex
 	}
 )
 
@@ -71,12 +70,9 @@ func newServer(c Config) *Server {
 		put:                   make(chan *Connection),
 		free:                  make(chan *Connection),
 		connections:           make(map[string]*Connection),
-		join:                  make(chan websocketRoomPayload,1), // buffered because join can be called immediately on connection connected
-		leave:                 make(chan websocketRoomPayload),
-		messages:              make(chan websocketMessagePayload, 10), // buffered because messages can be sent/received immediately on connection connected
+		messages:              make(chan websocketMessagePayload, 4096), // buffered because messages can be sent/received immediately on connection connected
 		onConnectionListeners: make([]ConnectionFunc,0),
 		namespaces:            make(map[string]*NameSpace),
-        mu:                    sync.Mutex{},
 	}
 
 	// default  namespace
@@ -126,9 +122,9 @@ func (s *Server) OnConnection(cb ConnectionFunc) {
 func (s *Server) onPut(c *Connection) {
 
 
-    s.mu.Lock()
+	s.coLock.Lock()
     s.connections[c.id] = c
-	defer s.mu.Unlock()
+	s.coLock.Unlock()
 
     c.namespace.joinRoom(c.id,c.id)   // join a default room
     
@@ -145,14 +141,15 @@ func (s *Server) onFree(c *Connection) {
 
 	if _, found := s.connections[c.id]; found {
 
-		s.mu.Lock()
+		
 
 		for roomName := range c.namespace.rooms {
             c.namespace.leaveRoom(roomName,c.id)
 		}
+		s.coLock.Lock()
 		delete(s.connections, c.id)
 		close(c.send)
-        s.mu.Unlock()
+        s.coLock.Unlock()
 		
         
         c.fireDisconnect()

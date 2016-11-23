@@ -77,10 +77,10 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
     namespace, ok := s.namespaces[namespaceName]
 
     if !ok {
-		s.mu.Lock()
+		s.nsLock.Lock()
 		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
 		s.namespaces[namespaceName] = namespace
-		s.mu.Unlock()
+		s.nsLock.Unlock()
 	}
 
 	c.namespace = namespace
