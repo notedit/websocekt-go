@@ -25,6 +25,9 @@ type Config struct {
 	Error       func(res http.ResponseWriter, req *http.Request, status int, reason error)
 	CheckOrigin func(req *http.Request) bool
 
+	// we may want to custom the id generate from the request
+	CustomIDFunc ConnectionIDFunc
+
 	// WriteTimeout time allowed to write a message to the connection.
 	// Default value is 15 * time.Second
 	WriteTimeout time.Duration

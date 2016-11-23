@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"net/http"
 
 	"github.com/valyala/bytebufferpool"
 )
@@ -183,7 +184,7 @@ func Random(n int) []byte {
 	return b
 }
 
-// RandomString accepts a number(10 for example) and returns a random string using simple but fairly safe random algorithm
+
 func RandomString(n int) string {
 	return string(Random(n))
 }

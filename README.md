@@ -12,5 +12,6 @@ websocket go
 
 * add more test
 * add more docs
-* custom connection is generate
+* add benchmark
+
 

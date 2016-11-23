@@ -22,6 +22,9 @@ type (
 	// MessageFunc is the second argument to the Emmiter's Emit functions.
 	// A callback which should receives one parameter of type string, int, bool or any valid JSON/Go struct
 	MessageFunc interface{}
+
+	ConnectionIDFunc func(*http.Request)string
+
 	// Connection is the front-end API that you will use to communicate with the client side
 
 	Connection struct {
@@ -47,7 +50,6 @@ type (
 func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) *Connection {
 	c := &Connection{
 		underline:   underlineConn,
-		id:          RandomString(64),
 		messageType: websocket.TextMessage,
 		send:        make(chan []byte, 256),
 		onDisconnectListeners:    make([]DisconnectFunc, 0),
@@ -58,6 +60,13 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 		request:                  req,
 		data:                     make(map[string]string),
 	}
+
+	if s.config.CustomIDFunc != nil {
+		c.id = s.config.CustomIDFunc(req)
+	} else {
+		c.id = RandomString(64)
+	}
+	
 
 	namespaceName := c.Request().URL.Path
 
@@ -84,6 +93,9 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 
 	return c
 }
+
+
+
 
 func (c *Connection) write(websocketMessageType int, data []byte) error {
 	c.underline.SetWriteDeadline(time.Now().Add(c.server.config.WriteTimeout))
@@ -315,3 +327,7 @@ func (c *Connection) Get(key string) string {
 func (c *Connection) Set(key string, value string) {
 	c.data[key] = value
 }
+
+
+
+

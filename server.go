@@ -44,7 +44,6 @@ type (
 		mu                    sync.Mutex // for namespaces
 		messages              chan websocketMessagePayload
 		onConnectionListeners []ConnectionFunc
-		//connectionPool        *sync.Pool // sadly I can't make this because the websocket connection is live until is closed.
 		broadcast Emmiter
 
 		// NameSpace
