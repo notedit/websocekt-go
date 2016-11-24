@@ -196,10 +196,7 @@ func (s *Server)onMessage(msg websocketMessagePayload){
 		for _, connectionIDInsideRoom := range connectionIDs {
 			if c, connected := s.connections[connectionIDInsideRoom]; connected {
 				c.send <- msg.data //here we send it without need to continue below
-			} else {
-				// the connection is not connected but it's inside the room, we remove it on disconnect but for ANY CASE:
-				c.Leave(msg.to)
-			}
+			} 
 		}
 
 	
