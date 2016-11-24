@@ -55,7 +55,7 @@ type (
 // New creates a websocket server and returns it
 func New(cfg ...Config) *Server {
 	c := Config{}
-	if len(cfg) > 1 {
+	if len(cfg)  > 0 {
 		c = cfg[0]
 	}
 	c = c.validate()

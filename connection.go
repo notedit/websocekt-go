@@ -7,6 +7,7 @@ import (
 	"time"
 	"sync"
 	"strings"
+	"fmt"
 
 	"github.com/gorilla/websocket"
 )
@@ -66,6 +67,8 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 	} else {
 		c.id = RandomString(64)
 	}
+
+	fmt.Println(c.id)
 	
 
 	namespaceName := c.Request().URL.Path

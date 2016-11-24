@@ -5,7 +5,7 @@ import (
     "fmt"
 	"net/http"
     "runtime"
-    
+    "time"
     "../../websocket-go"
 )
 
@@ -22,7 +22,7 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
 	c.Join("testroom")
 
-    c.List("testroom")
+    fmt.Println(c.List("testroom"))
 
     c.OnMessage(func(bytes []byte){
 
@@ -47,12 +47,22 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
 }
 
+
+func CustomConnecionID(req *http.Request) string {
+    
+    id := fmt.Sprintf("%s%d",req.URL.Path, time.Now().UnixNano())
+
+    return id
+}
+
 func main() {
     
     num := runtime.NumCPU()
     runtime.GOMAXPROCS(num)
-    
-    server = websocket.New(websocket.Config{})
+
+    server = websocket.New(websocket.Config{
+        CustomIDFunc:CustomConnecionID,
+    })
 
 	http.Handle("/testnamespace", server.Handler())
 
