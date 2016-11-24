@@ -32,11 +32,9 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
 	})
 
-	go func() {
 
-		server.Of("testnamespace").To("testroom").Emit("chat", "fffffffffffffffff")
+	server.Of("testnamespace").To("testroom").Emit("chat", "fffffffffffffffff")
 
-	}()
 
 }
 
@@ -53,7 +51,7 @@ func main() {
 	runtime.GOMAXPROCS(num)
 
 	server = websocket.New(websocket.Config{
-		CustomIDFunc: CustomConnecionID,
+		//CustomIDFunc: CustomConnecionID,
 	})
 
 	http.Handle("/testnamespace", server.Handler())

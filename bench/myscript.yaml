@@ -1,0 +1,18 @@
+{
+  "config": {
+      "target": "ws://localhost:3000/testnamespace",
+      "phases": [
+        {"duration": 20, "arrivalRate": 500}
+      ],
+  },
+  "scenarios": [
+    {
+      "engine": "ws",
+      "flow": [
+        {"send": "hello"},
+        {"think": 1},
+        {"send": "world"}
+      ]
+    }
+  ]
+}
