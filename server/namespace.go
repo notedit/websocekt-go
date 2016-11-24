@@ -23,12 +23,21 @@ func (n *NameSpace) List(room string) []*Connection {
 	connList := make([]*Connection,0)
 
     n.mu.Lock()
-	for _, connectionIDInsideRoom := range n.rooms[room] {
-		if c, connected := n.server.connections[connectionIDInsideRoom]; connected {
-			connList = append(connList, c)
-		} 
-	}
+    connectionIDs,ok := n.rooms[room]
     n.mu.Unlock()
+
+    if !ok {
+        return connList
+    }
+
+    n.server.coLock.Lock()
+    for _, connectionIDInsideRoom := range connectionIDs {
+	    if c, connected := n.server.connections[connectionIDInsideRoom]; connected {
+		    connList = append(connList, c)
+	    } 
+    }
+    n.server.coLock.Unlock()
+
 	return connList
 }
 
@@ -48,7 +57,7 @@ func (n *NameSpace) joinRoom(roomName string, connID string) {
     if _,ok := n.rooms[roomName]; !ok {
         n.rooms[roomName] = make([]string,0)
     }
-    
+
     n.rooms[roomName] = append(n.rooms[roomName], connID)
 
 }
