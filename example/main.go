@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"../server"
+	"../../websocket-go/server"
 )
 
 var server *websocket.Server // with the default configuration
