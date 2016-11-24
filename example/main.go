@@ -2,11 +2,9 @@ package main
 
 import (
 
-    "log"
     "fmt"
 	"net/http"
     "runtime"
-    "time"
     
     "../../websocket-go"
 )
@@ -19,7 +17,6 @@ var server *websocket.Server  // with the default configuration
 func handleWebsocketConnection(c *websocket.Connection) {
 
 
-    log.Println("handleWebsocketConnection")
 
 	c.Set("test", "test value")
 
@@ -27,31 +24,21 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
     c.List("testroom")
 
+    c.OnMessage(func(bytes []byte){
+
+    })
+
 	c.On("chat", func(message string) {
 
 		c.To("testroom").Emit("chat", "fafafafafa")
 	})
 
 	c.OnDisconnect(func() {
-		fmt.Printf("\nConnection with ID: %s has been disconnected!", c.ID())
-	})
+
+    })
 
 
-    // test room
-    go func(c *websocket.Connection){
-
-        time.Sleep(2 * time.Second)
-
-        c.To("testroom").Emit("chat","fffffffff")
-
-        log.Printf("rooms  %v", c.List("testroom"))
-
-    }(c)
-
-    // test namespace
-    go func(){
-        
-        time.Sleep(4 * time.Second)
+    go func(){        
 
         server.Of("testnamespace").To("testroom").Emit("chat","fffffffffffffffff")
 
