@@ -20,6 +20,7 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
 	c.OnMessage(func(bytes []byte) {
 
+		c.Emit("chat", string(bytes))
 	})
 
 	c.On("chat", func(message string) {

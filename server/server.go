@@ -75,12 +75,6 @@ func newServer(c Config) *Server {
 		namespaces:            make(map[string]*NameSpace),
 	}
 
-// 	type NameSpace struct {
-// 	server *Server
-// 	name   string
-// 	rooms  Rooms      // by default a connection is joined to a room which has the connection id as its name
-// 	mu     sync.Mutex // for rooms
-// }
 
 	// default  namespace
     defaultNameSpace := &NameSpace{
@@ -137,7 +131,7 @@ func (s *Server) onPut(c *Connection) {
     s.connections[c.id] = c
 	s.coLock.Unlock()
 
-    c.namespace.joinRoom(c.id,c.id)   // join a default room
+    c.Join(c.id)   // join a default room
     
 	for i := range s.onConnectionListeners {
 		go s.onConnectionListeners[i](c)
@@ -149,22 +143,70 @@ func (s *Server) onPut(c *Connection) {
 func (s *Server) onFree(c *Connection) {
 
 	//  todo checks  namespace
+	s.coLock.Lock()
+	defer s.coLock.Unlock()
 
 	if _, found := s.connections[c.id]; found {
 
-		
-
 		for roomName := range c.namespace.rooms {
-            c.namespace.leaveRoom(roomName,c.id)
+            c.Leave(roomName)
 		}
-		s.coLock.Lock()
+
 		delete(s.connections, c.id)
 		close(c.send)
-        s.coLock.Unlock()
-		
         
         c.fireDisconnect()
 	}
+
+}
+
+func (s *Server)onMessage(msg websocketMessagePayload){
+
+	if msg.to == All {
+		
+		s.coLock.Lock()
+		defer s.coLock.Unlock()
+
+		for connID, c := range s.connections {
+			select {
+			case s.connections[connID].send <- msg.data: //send the message back to the connection in order to send it to the client
+			default:
+				close(c.send)
+				delete(s.connections, connID)
+				c.fireDisconnect()
+
+			}
+
+		}
+
+	} else {
+
+		s.nsLock.Lock()
+		namespace, ok := s.namespaces[msg.namespace]
+		s.nsLock.Unlock()
+		if ! ok {
+			return 
+		}
+
+		s.coLock.RLock()
+		defer s.coLock.RUnlock()
+
+		connectionIDs := namespace.List(msg.to)
+		
+		for _, connectionIDInsideRoom := range connectionIDs {
+			if c, connected := s.connections[connectionIDInsideRoom]; connected {
+				c.send <- msg.data //here we send it without need to continue below
+			} else {
+                
+				namespace.leaveRoom(msg.to,connectionIDInsideRoom)
+			}
+		}
+
+	
+		// it suppose to send the message to a room
+
+	}
+
 
 }
 
@@ -173,14 +215,6 @@ func (s *Server) Serve() {
 	go s.serve()
 }
 
-//  to the default namespace
-func (s *Server) To(to string) Emmiter {
-
-	// send to  default namespace's room
-	namespance := s.namespaces[defaultNameSpaceName]
-
-	return newEmmiter(namespance, to)
-}
 
 func (s *Server) ToAll() Emmiter {
 
@@ -191,6 +225,9 @@ func (s *Server) ToAll() Emmiter {
 
 func (s *Server) GetConnection(cid string) *Connection {
 
+	s.coLock.Lock()
+	defer s.coLock.Unlock()
+
 	conn, ok := s.connections[cid]
 	if !ok {
 		return nil
@@ -200,10 +237,13 @@ func (s *Server) GetConnection(cid string) *Connection {
 
 func (s *Server) Of(namespaceName string) *NameSpace {
 
+	s.nsLock.Lock()
+	defer s.nsLock.Unlock()
+
 	if namespace, ok := s.namespaces[namespaceName]; ok {
 		return namespace
 	}
-
+	
 	// if not  we just create a,  but not save to server
 	namespace := &NameSpace{server: s, name: namespaceName,rooms:make(Rooms,0),}
 	return namespace
@@ -217,37 +257,8 @@ func (s *Server) serve() {
 		case c := <-s.free: // connection closed
 			s.onFree(c)
 		case msg := <-s.messages: // message received from the connection
-			if msg.to == All {
-				for connID, c := range s.connections {
-					select {
-					case s.connections[connID].send <- msg.data: //send the message back to the connection in order to send it to the client
-					default:
-						close(c.send)
-						delete(s.connections, connID)
-						c.fireDisconnect()
+		    s.onMessage(msg)
 
-					}
-
-				}
-
-			} else if namespace, ok := s.namespaces[msg.namespace]; ok {
-
-				// get namespace first
-				if _, ok := namespace.rooms[msg.to]; ok {
-
-					for _, connectionIDInsideRoom := range namespace.rooms[msg.to] {
-						if c, connected := s.connections[connectionIDInsideRoom]; connected {
-							c.send <- msg.data //here we send it without need to continue below
-						} else {
-							// the connection is not connected but it's inside the room, we remove it on disconnect but for ANY CASE:
-                            c.namespace.leaveRoom(msg.to, c.id)
-						}
-					}
-
-				}
-				// it suppose to send the message to a room
-
-			}
 
 		}
 

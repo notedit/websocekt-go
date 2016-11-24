@@ -73,15 +73,15 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 	if strings.HasPrefix(namespaceName, "/") {
 		namespaceName = namespaceName[1:]
 	}
-    
+
+	s.nsLock.Lock()
     namespace, ok := s.namespaces[namespaceName]
 
     if !ok {
-		s.nsLock.Lock()
 		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
 		s.namespaces[namespaceName] = namespace
-		s.nsLock.Unlock()
 	}
+	s.nsLock.Unlock()
 
 	c.namespace = namespace
 
@@ -281,12 +281,12 @@ func (c *Connection) On(event string, cb MessageFunc) {
 
 
 
-func (c *Connection)List(room string) []*Connection {
+func (c *Connection)List(room string) []string {
 
 
     if c.namespace == nil {
 
-        return make([]*Connection,0)
+        return make([]string,0)
     }
 
     return c.namespace.List(room)
