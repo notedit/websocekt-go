@@ -1,32 +1,26 @@
 package main
 
 import (
-
-    "fmt"
+	"fmt"
 	"net/http"
-    "runtime"
-    
-    "../../websocket-go"
+	"runtime"
+
+	"../server"
 )
 
-
-
-var server *websocket.Server  // with the default configuration
-
+var server *websocket.Server // with the default configuration
 
 func handleWebsocketConnection(c *websocket.Connection) {
-
-
 
 	c.Set("test", "test value")
 
 	c.Join("testroom")
 
-    c.List("testroom")
+	c.List("testroom")
 
-    c.OnMessage(func(bytes []byte){
+	c.OnMessage(func(bytes []byte) {
 
-    })
+	})
 
 	c.On("chat", func(message string) {
 
@@ -35,23 +29,22 @@ func handleWebsocketConnection(c *websocket.Connection) {
 
 	c.OnDisconnect(func() {
 
-    })
+	})
 
+	go func() {
 
-    go func(){        
+		server.Of("testnamespace").To("testroom").Emit("chat", "fffffffffffffffff")
 
-        server.Of("testnamespace").To("testroom").Emit("chat","fffffffffffffffff")
-
-    }()
+	}()
 
 }
 
 func main() {
-    
-    num := runtime.NumCPU()
-    runtime.GOMAXPROCS(num)
-    
-    server = websocket.New(websocket.Config{})
+
+	num := runtime.NumCPU()
+	runtime.GOMAXPROCS(num)
+
+	server = websocket.New(websocket.Config{})
 
 	http.Handle("/testnamespace", server.Handler())
 
