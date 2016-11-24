@@ -11,11 +11,6 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
-// -----------------websocket messages and de/serialization implementation--------------
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
 
 /*
 serializer, [de]websocketMessageSerialize the messages from the client to the websocketServer and from the websocketServer to the client
@@ -31,7 +26,7 @@ const (
 )
 
 const (
-	websocketMessagePrefix          = "go-websocket-message:"
+	websocketMessagePrefix          = "websocket:"
 	websocketMessageSeparator       = ";"
 	websocketMessagePrefixLen       = len(websocketMessagePrefix)
 	websocketMessageSeparatorLen    = len(websocketMessageSeparator)
