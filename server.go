@@ -75,8 +75,19 @@ func newServer(c Config) *Server {
 		namespaces:            make(map[string]*NameSpace),
 	}
 
+// 	type NameSpace struct {
+// 	server *Server
+// 	name   string
+// 	rooms  Rooms      // by default a connection is joined to a room which has the connection id as its name
+// 	mu     sync.Mutex // for rooms
+// }
+
 	// default  namespace
-    defaultNameSpace := &NameSpace{s,defaultNameSpaceName,make(Rooms),sync.Mutex{}}
+    defaultNameSpace := &NameSpace{
+		server:s,
+		name:defaultNameSpaceName,
+		rooms:make(Rooms),
+	}
 	s.namespaces[defaultNameSpaceName] = defaultNameSpace
 	s.broadcast = newEmmiter(defaultNameSpace, All)
 
@@ -176,18 +187,7 @@ func (s *Server) ToAll() Emmiter {
 	return s.broadcast
 }
 
-func (s *Server) List(room string) []*Connection {
 
-	namespance := s.namespaces[defaultNameSpaceName]
-
-	var connList []*Connection
-	for _, connectionIDInsideRoom := range namespance.rooms[room] {
-		if c, connected := s.connections[connectionIDInsideRoom]; connected {
-			connList = append(connList, c)
-		}
-	}
-	return connList
-}
 
 func (s *Server) GetConnection(cid string) *Connection {
 
@@ -205,7 +205,7 @@ func (s *Server) Of(namespaceName string) *NameSpace {
 	}
 
 	// if not  we just create a,  but not save to server
-	namespace := &NameSpace{server: s, name: namespaceName}
+	namespace := &NameSpace{server: s, name: namespaceName,rooms:make(Rooms,0),}
 	return namespace
 }
 
