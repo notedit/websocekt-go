@@ -2,16 +2,15 @@ package websocket
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"strconv"
-	"time"
-	"sync"
 	"strings"
-	"fmt"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
-
 
 type (
 	// DisconnectFunc is the callback which fires when a client/connection closed
@@ -24,7 +23,7 @@ type (
 	// A callback which should receives one parameter of type string, int, bool or any valid JSON/Go struct
 	MessageFunc interface{}
 
-	ConnectionIDFunc func(*http.Request)string
+	ConnectionIDFunc func(*http.Request) string
 
 	// Connection is the front-end API that you will use to communicate with the client side
 
@@ -69,7 +68,6 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 	}
 
 	fmt.Println(c.id)
-	
 
 	namespaceName := c.Request().URL.Path
 
@@ -78,10 +76,10 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 	}
 
 	s.nsLock.Lock()
-    namespace, ok := s.namespaces[namespaceName]
+	namespace, ok := s.namespaces[namespaceName]
 
-    if !ok {
-		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms),mu:sync.Mutex{},}
+	if !ok {
+		namespace = &NameSpace{server: s, name: namespaceName, rooms: make(Rooms), mu: sync.Mutex{}}
 		s.namespaces[namespaceName] = namespace
 	}
 	s.nsLock.Unlock()
@@ -92,13 +90,8 @@ func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) 
 		c.messageType = websocket.TextMessage
 	}
 
-	
-
 	return c
 }
-
-
-
 
 func (c *Connection) write(websocketMessageType int, data []byte) error {
 	c.underline.SetWriteDeadline(time.Now().Add(c.server.config.WriteTimeout))
@@ -237,7 +230,6 @@ func (c *Connection) fireDisconnect() {
 
 func (c *Connection) To(to string) Emmiter {
 
-
 	return newEmmiter(c.namespace, to)
 }
 
@@ -282,35 +274,31 @@ func (c *Connection) On(event string, cb MessageFunc) {
 	c.onEventListeners[event] = append(c.onEventListeners[event], cb)
 }
 
+func (c *Connection) List(room string) []string {
 
+	if c.namespace == nil {
 
-func (c *Connection)List(room string) []string {
+		return make([]string, 0)
+	}
 
-
-    if c.namespace == nil {
-
-        return make([]string,0)
-    }
-
-    return c.namespace.List(room)
+	return c.namespace.List(room)
 }
-
 
 func (c *Connection) Join(roomName string) {
 	//payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
 	//c.server.join <- payload
-    // use the new join
+	// use the new join
 
-    c.namespace.joinRoom(roomName,c.id)
-    
+	c.namespace.joinRoom(roomName, c.id)
+
 }
 
 func (c *Connection) Leave(roomName string) {
 	//payload := websocketRoomPayload{c.namespace.name, roomName, c.id}
 	//c.server.leave <- payload
-    // use the new leave
+	// use the new leave
 
-    c.namespace.leaveRoom(roomName,c.id)
+	c.namespace.leaveRoom(roomName, c.id)
 
 }
 
@@ -330,7 +318,3 @@ func (c *Connection) Get(key string) string {
 func (c *Connection) Set(key string, value string) {
 	c.data[key] = value
 }
-
-
-
-

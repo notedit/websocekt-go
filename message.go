@@ -183,7 +183,6 @@ func Random(n int) []byte {
 	return b
 }
 
-
 func RandomString(n int) string {
 	return string(Random(n))
 }

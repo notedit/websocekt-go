@@ -42,11 +42,11 @@ type (
 		coLock                sync.RWMutex
 		messages              chan websocketMessagePayload
 		onConnectionListeners []ConnectionFunc
-		broadcast Emmiter
+		broadcast             Emmiter
 
 		// NameSpace
 		namespaces map[string]*NameSpace
-		nsLock	    sync.Mutex
+		nsLock     sync.Mutex
 	}
 )
 
@@ -55,7 +55,7 @@ type (
 // New creates a websocket server and returns it
 func New(cfg ...Config) *Server {
 	c := Config{}
-	if len(cfg)  > 0 {
+	if len(cfg) > 0 {
 		c = cfg[0]
 	}
 	c = c.validate()
@@ -71,16 +71,15 @@ func newServer(c Config) *Server {
 		free:                  make(chan *Connection),
 		connections:           make(map[string]*Connection),
 		messages:              make(chan websocketMessagePayload, 4096), // buffered because messages can be sent/received immediately on connection connected
-		onConnectionListeners: make([]ConnectionFunc,0),
+		onConnectionListeners: make([]ConnectionFunc, 0),
 		namespaces:            make(map[string]*NameSpace),
 	}
 
-
 	// default  namespace
-    defaultNameSpace := &NameSpace{
-		server:s,
-		name:defaultNameSpaceName,
-		rooms:make(Rooms),
+	defaultNameSpace := &NameSpace{
+		server: s,
+		name:   defaultNameSpaceName,
+		rooms:  make(Rooms),
 	}
 	s.namespaces[defaultNameSpaceName] = defaultNameSpace
 	s.broadcast = newEmmiter(defaultNameSpace, All)
@@ -117,26 +116,22 @@ func (s *Server) handleConnection(websocketConn *websocket.Conn, req *http.Reque
 	c.reader()
 }
 
-
 // OnConnection this is the main event you, as developer, will work with each of the websocket connections
 func (s *Server) OnConnection(cb ConnectionFunc) {
 	s.onConnectionListeners = append(s.onConnectionListeners, cb)
 }
 
-
 func (s *Server) onPut(c *Connection) {
 
-
 	s.coLock.Lock()
-    s.connections[c.id] = c
+	s.connections[c.id] = c
 	s.coLock.Unlock()
 
-    c.Join(c.id)   // join a default room
-    
+	c.Join(c.id) // join a default room
+
 	for i := range s.onConnectionListeners {
 		go s.onConnectionListeners[i](c)
 	}
-
 
 }
 
@@ -149,21 +144,21 @@ func (s *Server) onFree(c *Connection) {
 	if _, found := s.connections[c.id]; found {
 
 		for roomName := range c.namespace.rooms {
-            c.Leave(roomName)
+			c.Leave(roomName)
 		}
 
 		delete(s.connections, c.id)
 		close(c.send)
-        
-        c.fireDisconnect()
+
+		c.fireDisconnect()
 	}
 
 }
 
-func (s *Server)onMessage(msg websocketMessagePayload){
+func (s *Server) onMessage(msg websocketMessagePayload) {
 
 	if msg.to == All {
-		
+
 		s.coLock.Lock()
 		defer s.coLock.Unlock()
 
@@ -184,29 +179,27 @@ func (s *Server)onMessage(msg websocketMessagePayload){
 		s.nsLock.Lock()
 		namespace, ok := s.namespaces[msg.namespace]
 		s.nsLock.Unlock()
-		if ! ok {
-			return 
+		if !ok {
+			return
 		}
 
 		s.coLock.RLock()
 		defer s.coLock.RUnlock()
 
 		connectionIDs := namespace.List(msg.to)
-		
+
 		for _, connectionIDInsideRoom := range connectionIDs {
 			if c, connected := s.connections[connectionIDInsideRoom]; connected {
 				c.send <- msg.data //here we send it without need to continue below
 			} else {
-                
-				namespace.leaveRoom(msg.to,connectionIDInsideRoom)
+
+				namespace.leaveRoom(msg.to, connectionIDInsideRoom)
 			}
 		}
 
-	
 		// it suppose to send the message to a room
 
 	}
-
 
 }
 
@@ -215,13 +208,10 @@ func (s *Server) Serve() {
 	go s.serve()
 }
 
-
 func (s *Server) ToAll() Emmiter {
 
 	return s.broadcast
 }
-
-
 
 func (s *Server) GetConnection(cid string) *Connection {
 
@@ -243,9 +233,9 @@ func (s *Server) Of(namespaceName string) *NameSpace {
 	if namespace, ok := s.namespaces[namespaceName]; ok {
 		return namespace
 	}
-	
+
 	// if not  we just create a,  but not save to server
-	namespace := &NameSpace{server: s, name: namespaceName,rooms:make(Rooms,0),}
+	namespace := &NameSpace{server: s, name: namespaceName, rooms: make(Rooms, 0)}
 	return namespace
 }
 
@@ -257,8 +247,7 @@ func (s *Server) serve() {
 		case c := <-s.free: // connection closed
 			s.onFree(c)
 		case msg := <-s.messages: // message received from the connection
-		    s.onMessage(msg)
-
+			s.onMessage(msg)
 
 		}
 
