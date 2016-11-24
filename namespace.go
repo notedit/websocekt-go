@@ -18,27 +18,15 @@ type NameSpace struct {
 	mu     sync.Mutex // for rooms
 }
 
-func (n *NameSpace) List(room string) []*Connection {
-
-	connList := make([]*Connection,0)
+func (n *NameSpace) List(room string) []string {
 
     n.mu.Lock()
-    connectionIDs,ok := n.rooms[room]
-    n.mu.Unlock()
+    defer n.mu.Unlock()
 
-    if !ok {
-        return connList
-    }
+    connectionIDs,_ := n.rooms[room]
 
-    n.server.coLock.Lock()
-    for _, connectionIDInsideRoom := range connectionIDs {
-	    if c, connected := n.server.connections[connectionIDInsideRoom]; connected {
-		    connList = append(connList, c)
-	    } 
-    }
-    n.server.coLock.Unlock()
+    return connectionIDs
 
-	return connList
 }
 
 func (n *NameSpace) To(to string) Emmiter {
@@ -46,8 +34,6 @@ func (n *NameSpace) To(to string) Emmiter {
 	return newEmmiter(n, to)
 
 }
-
-
 
 func (n *NameSpace) joinRoom(roomName string, connID string) {
 
