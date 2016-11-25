@@ -1,27 +1,23 @@
 package websocket
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	ws "github.com/gorilla/websocket"
-	websocket "github.com/notedit/websocket-go"
 )
 
-var server = websocket.New(websocket.Config{})
+var server = New(Config{})
 var addr = "localhost:8080"
 
 func runServer() {
 
 	http.Handle("/testnamespace", server.Handler())
 
-	server.OnConnection(func(c *websocket.Connection) {
+	server.OnConnection(func(c *Connection) {
 
 		c.Join("room")
-
-		fmt.Println(" after join", server.Of("testnamespace").List("room"))
 
 		c.OnMessage(func(bytes []byte) {
 			c.EmitMessage(bytes)
@@ -81,5 +77,13 @@ func TestRoomJoinLeave(t *testing.T) {
 
 		t.Error("leave room fail")
 	}
+
+	server.Stop()
+
+}
+
+func BenchmarkLoops(b *testing.B) {
+
+	go runServer()
 
 }

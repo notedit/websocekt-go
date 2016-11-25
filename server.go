@@ -36,6 +36,7 @@ type (
 
 	Server struct {
 		config                Config
+		done                  chan bool
 		put                   chan *Connection
 		free                  chan *Connection
 		connections           map[string]*Connection
@@ -67,6 +68,7 @@ func newServer(c Config) *Server {
 
 	s := &Server{
 		config:                c,
+		done:                  make(chan bool),
 		put:                   make(chan *Connection),
 		free:                  make(chan *Connection),
 		connections:           make(map[string]*Connection),
@@ -208,12 +210,16 @@ func (s *Server) Serve() {
 	go s.serve()
 }
 
+func (s *Server) Stop() {
+	s.done <- true
+}
+
 func (s *Server) ToAll() Emmiter {
 
 	return s.broadcast
 }
 
-func (s *Server) GetConnection(cid string) *Connection {
+func (s *Server) Connection(cid string) *Connection {
 
 	s.coLock.Lock()
 	defer s.coLock.Unlock()
@@ -248,7 +254,8 @@ func (s *Server) serve() {
 			s.onFree(c)
 		case msg := <-s.messages: // message received from the connection
 			s.onMessage(msg)
-
+		case <-s.done:
+			break
 		}
 
 	}
