@@ -10,8 +10,6 @@ websocket go
 
 ### TODO
 
-* add more test
 * add more docs
-* add benchmark
-
+* add support for multi node
 
