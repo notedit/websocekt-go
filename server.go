@@ -19,7 +19,8 @@ type (
 	ConnectionFunc func(*Connection)
 	// Rooms is just a map with key a string and  value slice of string
 	Rooms map[string][]string
-
+    // UsersRooms is a user in rooms
+    UsersRooms map[string][]string
 	// websocketRoomPayload is used as payload from the connection to the server
 	websocketRoomPayload struct {
 		namespace    string
@@ -229,6 +230,23 @@ func (s *Server) Connection(cid string) *Connection {
 		return nil
 	}
 	return conn
+}
+
+func (s *Server) Connections() []string {
+    
+    s.coLock.Lock()
+    defer s.coLock.Unlock()
+
+    keys := make([]string,len(s.connections))
+
+    i := 0 
+    for k := range s.connections {
+        keys[i] = k
+        i++
+    }
+
+    return keys
+
 }
 
 func (s *Server) Of(namespaceName string) *NameSpace {
