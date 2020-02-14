@@ -49,9 +49,9 @@ type (
 
 func newConnection(underlineConn *websocket.Conn, s *Server, req *http.Request) *Connection {
 	c := &Connection{
-		underline:   underlineConn,
-		messageType: websocket.TextMessage,
-		send:        make(chan []byte, 256),
+		underline:                underlineConn,
+		messageType:              websocket.TextMessage,
+		send:                     make(chan []byte, 256),
 		onDisconnectListeners:    make([]DisconnectFunc, 0),
 		onErrorListeners:         make([]ErrorFunc, 0),
 		onNativeMessageListeners: make([]NativeMessageFunc, 0),

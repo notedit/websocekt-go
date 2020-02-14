@@ -14,7 +14,7 @@ type NameSpace struct {
 	name    string
 	rooms   Rooms      // by default a connection is joined to a room which has the connection id as its name
 	mu      sync.Mutex // for rooms
-    inrooms UsersRooms //  
+	inrooms UsersRooms //
 }
 
 func (n *NameSpace) List(room string) []string {

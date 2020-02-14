@@ -8,8 +8,6 @@ websocket go
 * support room join/leave
 
 
-### TODO
 
-* add more docs
-* add support for multi node
+
 

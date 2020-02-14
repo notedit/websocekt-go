@@ -11,7 +11,6 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-
 /*
 serializer, [de]websocketMessageSerialize the messages from the client to the websocketServer and from the websocketServer to the client
 */
